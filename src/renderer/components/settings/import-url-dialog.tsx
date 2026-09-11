@@ -94,7 +94,8 @@ export function ImportUrlDialog({ open, onOpenChange, onImportSuccess }: ImportU
       value.startsWith('vless://') ||
       value.startsWith('trojan://') ||
       value.startsWith('hysteria2://') ||
-      value.startsWith('hy2://')
+      value.startsWith('hy2://') ||
+      value.startsWith('vmess://')
     );
   };
 
@@ -234,7 +235,7 @@ export function ImportUrlDialog({ open, onOpenChange, onImportSuccess }: ImportU
             导入服务器
           </DialogTitle>
           <DialogDescription>
-            支持导入 vless://、trojan://、hysteria2:// 和 hy2:// 协议链接，以及多节点订阅
+            支持导入 vless://、trojan://、hysteria2://、hy2:// 和 vmess:// 协议链接，以及多节点订阅
           </DialogDescription>
         </DialogHeader>
 
@@ -282,7 +283,7 @@ export function ImportUrlDialog({ open, onOpenChange, onImportSuccess }: ImportU
               </div>
               {url.trim() && !isValidUrl(url.trim()) && (
                 <p className="text-sm text-destructive">
-                  请输入有效的 vless://、trojan://、hysteria2:// 或 hy2:// 协议链接
+                  请输入有效的 vless://、trojan://、hysteria2://、hy2:// 或 vmess:// 协议链接
                 </p>
               )}
             </div>
@@ -319,6 +320,12 @@ export function ImportUrlDialog({ open, onOpenChange, onImportSuccess }: ImportU
                       <span className="ml-2">{parsedConfig.security}</span>
                     </div>
                     {parsedConfig.protocol === 'vless' && parsedConfig.uuid && (
+                      <div className="col-span-2">
+                        <span className="text-muted-foreground">UUID:</span>
+                        <span className="ml-2 font-mono text-xs">{parsedConfig.uuid}</span>
+                      </div>
+                    )}
+                    {parsedConfig.protocol === 'vmess' && parsedConfig.uuid && (
                       <div className="col-span-2">
                         <span className="text-muted-foreground">UUID:</span>
                         <span className="ml-2 font-mono text-xs">{parsedConfig.uuid}</span>

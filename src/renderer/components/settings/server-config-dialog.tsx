@@ -87,7 +87,7 @@ export function ServerConfigDialog({
           <DialogDescription>
             {isEditing
               ? '修改服务器配置信息。保存后不会自动重启代理服务。'
-              : '添加新的代理服务器配置。支持 VLESS 和 Trojan 协议。'}
+              : '添加新的代理服务器配置。支持 VLESS、Trojan、Hysteria2 和 VMess 协议。'}
           </DialogDescription>
         </DialogHeader>
 
@@ -113,6 +113,7 @@ export function ServerConfigDialog({
                 <SelectItem value="vless">VLESS</SelectItem>
                 <SelectItem value="trojan">Trojan</SelectItem>
                 <SelectItem value="hysteria2">Hysteria2</SelectItem>
+                <SelectItem value="vmess">VMess</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-sm text-muted-foreground">选择您的代理服务器协议类型</p>
@@ -146,6 +147,17 @@ export function ServerConfigDialog({
                 key={currentServerConfig?.id || 'new'}
                 serverConfig={
                   currentServerConfig?.protocol?.toLowerCase() === 'hysteria2'
+                    ? currentServerConfig
+                    : undefined
+                }
+                onSubmit={handleSave}
+              />
+            )}
+            {selectedProtocol === 'vmess' && (
+              <VlessForm
+                key={currentServerConfig?.id || 'new'}
+                serverConfig={
+                  currentServerConfig?.protocol?.toLowerCase() === 'vmess'
                     ? currentServerConfig
                     : undefined
                 }
