@@ -1570,6 +1570,13 @@ export class ProxyManager extends EventEmitter implements IProxyManager {
       }
     }
 
+    // VMess 特定配置
+    if (protocol === 'vmess') {
+      outbound.uuid = server.uuid;
+      outbound.security = server.encryption || 'auto';
+      outbound.alter_id = server.alterId || 0;
+    }
+
     // TLS 配置
     if (server.security === 'tls' || server.tlsSettings) {
       outbound.tls = {
