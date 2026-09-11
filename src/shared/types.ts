@@ -9,7 +9,7 @@
 
 export type ProxyMode = 'global' | 'smart' | 'direct';
 export type ProxyModeType = 'systemProxy' | 'tun';
-export type Protocol = 'vless' | 'trojan' | 'hysteria2';
+export type Protocol = 'vless' | 'trojan' | 'hysteria2' | 'vmess';
 export type Network = 'tcp' | 'ws' | 'grpc' | 'http';
 export type Hysteria2Network = 'tcp' | 'udp';
 export type Security = 'none' | 'tls' | 'reality';
@@ -77,6 +77,9 @@ export interface ServerConfig {
   uuid?: string;
   encryption?: string;
   flow?: string;
+
+  // VMess 特定
+  alterId?: number;
 
   // Trojan 和 Hysteria2 通用
   password?: string;
