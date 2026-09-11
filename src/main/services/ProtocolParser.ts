@@ -52,7 +52,8 @@ export class ProtocolParser implements IProtocolParser {
       url.startsWith('vless://') ||
       url.startsWith('trojan://') ||
       url.startsWith('hysteria2://') ||
-      url.startsWith('hy2://')
+      url.startsWith('hy2://') ||
+      url.startsWith('vmess://')
     );
   }
 
@@ -94,6 +95,11 @@ export class ProtocolParser implements IProtocolParser {
     }
 
     try {
+      // VMess 使用 base64 编码的 JSON，不是标准 URL 格式
+      if (url.startsWith('vmess://')) {
+        return this.parseVmess(url);
+      }
+
       const urlObj = new URL(url);
       let protocolStr = urlObj.protocol.replace(':', '');
 
@@ -302,6 +308,124 @@ export class ProtocolParser implements IProtocolParser {
   }
 
   /**
+   * 解析 VMess URL (vmess://base64(json))
+   * 标准 VMess 链接格式参考: https://github.com/2dust/v2rayN/wiki/%E5%88%86%E4%BA%AB%E9%93%BE%E6%8E%A5%E6%A0%BC%E5%BC%8F%E8%AF%B4%E6%98%8E
+   */
+  private parseVmess(url: string): ServerConfig {
+    const b64 = url.replace('vmess://', '');
+    let jsonStr: string;
+
+    try {
+      jsonStr = Buffer.from(b64, 'base64').toString('utf-8');
+    } catch {
+      throw new Error('VMess URL base64 解码失败');
+    }
+
+    let raw: {
+      v?: string;
+      ps?: string;
+      add?: string;
+      port?: string | number;
+      id?: string;
+      aid?: string | number;
+      scy?: string;
+      net?: string;
+      type?: string;
+      host?: string;
+      path?: string;
+      tls?: string;
+      sni?: string;
+      alpn?: string;
+      fp?: string;
+      insecure?: string;
+    };
+
+    try {
+      raw = JSON.parse(jsonStr);
+    } catch {
+      throw new Error('VMess URL JSON 解析失败');
+    }
+
+    const address = raw.add || '';
+    const port = parseInt(String(raw.port || '443'));
+    const uuid = raw.id || '';
+    const alterId = parseInt(String(raw.aid || '0'));
+    const name = raw.ps || `${address}:${port}`;
+
+    if (!uuid) {
+      throw new Error('VMess URL 缺少 UUID');
+    }
+
+    const config: ServerConfig = {
+      id: randomUUID(),
+      name,
+      protocol: 'vmess',
+      address,
+      port,
+      uuid,
+      alterId,
+      encryption: raw.scy || 'auto',
+    };
+
+    const network = raw.net;
+    if (network && network !== 'tcp') {
+      config.network = network as Network;
+
+      if (network === 'ws') {
+        const wsSettings: WebSocketSettings = {};
+        if (raw.path) {
+          wsSettings.path = raw.path;
+        }
+        if (raw.host) {
+          wsSettings.headers = { Host: raw.host };
+        }
+        if (Object.keys(wsSettings).length > 0) {
+          config.wsSettings = wsSettings;
+        }
+      } else if (network === 'grpc') {
+        const grpcSettings: GrpcSettings = {};
+        if (raw.path) {
+          grpcSettings.serviceName = raw.path;
+        }
+        config.grpcSettings = grpcSettings;
+      } else if (network === 'http') {
+        const httpSettings: HttpSettings = {};
+        if (raw.host) {
+          httpSettings.host = raw.host.split(',');
+        }
+        if (raw.path) {
+          httpSettings.path = raw.path;
+        }
+        config.httpSettings = httpSettings;
+      }
+    }
+
+    if (raw.tls === 'tls') {
+      config.security = 'tls';
+      const tlsSettings: TlsSettings = {};
+
+      if (raw.sni) {
+        tlsSettings.serverName = raw.sni;
+      } else if (raw.host) {
+        tlsSettings.serverName = raw.host;
+      }
+      if (raw.insecure === '1' || raw.insecure === 'true') {
+        tlsSettings.allowInsecure = true;
+      }
+      if (raw.fp) {
+        tlsSettings.fingerprint = raw.fp;
+      }
+      if (raw.alpn) {
+        tlsSettings.alpn = raw.alpn.split(',');
+      }
+
+      config.tlsSettings = tlsSettings;
+    }
+
+    return config;
+  }
+
+  /**
    * 解析传输层配置
    */
   private parseTransportSettings(
@@ -466,6 +590,8 @@ export class ProtocolParser implements IProtocolParser {
       return this.generateTrojanUrl(config);
     } else if (protocol === 'hysteria2') {
       return this.generateHysteria2Url(config);
+    } else if (protocol === 'vmess') {
+      return this.generateVmessUrl(config);
     }
     throw new Error(`不支持的协议: ${config.protocol}`);
   }
@@ -560,6 +686,72 @@ export class ProtocolParser implements IProtocolParser {
     const queryString = params.toString();
     const queryPart = queryString ? `?${queryString}` : '';
     return `hysteria2://${password}@${config.address}:${config.port}${queryPart}#${name}`;
+  }
+
+  /**
+   * 生成 VMess URL
+   */
+  private generateVmessUrl(config: ServerConfig): string {
+    const raw: Record<string, string> = {
+      v: '2',
+      ps: config.name || `${config.address}:${config.port}`,
+      add: config.address,
+      port: String(config.port || 443),
+      id: config.uuid || '',
+      aid: String(config.alterId || 0),
+      scy: config.encryption || 'auto',
+      net: config.network || 'tcp',
+      type: 'none',
+      host: '',
+      path: '',
+      tls: config.security === 'tls' ? 'tls' : '',
+      sni: '',
+      alpn: '',
+      fp: '',
+      insecure: '0',
+    };
+
+    // 传输层配置
+    if (config.network === 'ws' && config.wsSettings) {
+      if (config.wsSettings.path) {
+        raw.path = config.wsSettings.path;
+      }
+      if (config.wsSettings.headers?.Host) {
+        raw.host = config.wsSettings.headers.Host;
+      }
+    } else if (config.network === 'grpc' && config.grpcSettings) {
+      if (config.grpcSettings.serviceName) {
+        raw.path = config.grpcSettings.serviceName;
+      }
+      raw.type = 'grpc';
+    } else if (config.network === 'http' && config.httpSettings) {
+      if (config.httpSettings.path) {
+        raw.path = config.httpSettings.path;
+      }
+      if (config.httpSettings.host && config.httpSettings.host.length > 0) {
+        raw.host = config.httpSettings.host.join(',');
+      }
+    }
+
+    // TLS 配置
+    if (config.tlsSettings) {
+      if (config.tlsSettings.serverName) {
+        raw.sni = config.tlsSettings.serverName;
+      }
+      if (config.tlsSettings.allowInsecure) {
+        raw.insecure = '1';
+      }
+      if (config.tlsSettings.fingerprint) {
+        raw.fp = config.tlsSettings.fingerprint;
+      }
+      if (config.tlsSettings.alpn && config.tlsSettings.alpn.length > 0) {
+        raw.alpn = config.tlsSettings.alpn.join(',');
+      }
+    }
+
+    const jsonStr = JSON.stringify(raw);
+    const b64 = Buffer.from(jsonStr, 'utf-8').toString('base64');
+    return `vmess://${b64}`;
   }
 
   /**
