@@ -71,6 +71,13 @@ function buildOutbound(server: ServerConfig, tag: string): any {
     if (server.hysteria2Settings?.network) outbound.network = server.hysteria2Settings.network;
   }
 
+  // VMess 特定配置
+  if (protocol === 'vmess') {
+    outbound.uuid = server.uuid;
+    outbound.security = server.encryption || 'auto';
+    outbound.alter_id = server.alterId || 0;
+  }
+
   // TLS / Reality
   if (server.security === 'reality' && server.realitySettings) {
     outbound.tls = {
